@@ -657,6 +657,40 @@ void drawcircle(uint8_t *buff,uint8_t x0, uint8_t y0, uint8_t r,uint8_t color) {
 
 // function to draw a filled circle
 void fillcircle(uint8_t *buff,uint8_t x0, uint8_t y0, uint8_t r,uint8_t color) {
+uint8_t x = r, y = 0;
 	
+	// print the initial point
+	setpixel(buff, x + x0, y + y0, color);
+	
+	// When radius is zero only a single
+    // point will be printed
+	if(r >= 0)
+	{
+		setpixel(buff, x + x0, (-1)*y + y0, color);
+		setpixel(buff, y + x0, x + y0, color);
+		setpixel(buff, (-1)*y + x0, x + y0, color);
+	}
+	
+	uint8_t P = 1 - r;
+	
+	while (x > y)
+	{
+		y++;
+		
+		if(P <= 0)
+			P = P +2*y + 1;
+		
+		else
+		{
+			x--;
+			P = P + 2*y - 2*x + 1;
+		}
+		
+		if(x < y)
+			break;
+
+		drawline(buff,x + x0, y + y0,(-1)*x + x0, y + y0,color);
+		drawline(buff,x + x0, (-1)*y + y0,(-1)*x + x0,  (-1)*y + y0,color);
+	}
 }
 
