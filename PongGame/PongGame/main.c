@@ -8,6 +8,7 @@
 #include <stdbool.h>
 #include <util/delay.h>
 #include "lcd.h"
+#include "uart.h"
 
 #define FREQ 16000000
 #define BAUD 9600
@@ -17,6 +18,59 @@
 #define BLACK 0x000001
 
 char displayChar = 0;
+
+uint16_t x_coor;
+uint16_t y_coor;
+
+void setupADC(void){
+
+	ADMUX |= (1 << REFS0); 	// Setting ADC to use VCC as reference voltage
+	//  Use A0 pin to read input
+
+	ADCSRA |= (1 << ADATE) | (1 << ADEN) | (1<< ADPS1) ; // Turn ADC on,
+														 //  Use pre-scaler as 4
+														 //  Set auto-trigger.
+}
+
+void adcStartConversion(void){
+	ADCSRA |= (1 << ADSC);
+}
+
+void getADCval() {
+
+	// Disable the ADC mode
+	ADMUX &= ~(1 << MUX3);
+	
+	// Set X- , X+ to digital pins.
+	DDRC  = (1 << PORTC1) | (1 << PORTC3);
+	// Set X- high and X+ low.
+	PORTC |= (1 << PORTC3);
+	PORTC &= ~(1 << PORTC1);
+	
+	// Set Y- Y+ to ADC input.
+	ADMUX |= (0 << MUX0);
+	
+	// Read the x_coor here.
+	x_coor = ADC;
+	
+	// Now set configuration for the y_coor.
+	// Disable the ADC mode.
+	ADMUX &= ~(1 << MUX0);
+	
+	// Set Y-, Y+ to digital pins.
+	DDRC = (1 << PORTC0) | (1 << PORTC2);
+	// Set Y- high, Y+ low.
+	PORTC |= (1 << PORTC0);
+	PORTC &= ~(1 << PORTC2);
+	
+	// Set X- X+ to ADC input.
+	ADMUX |= (1 << MUX3);
+	
+	// Read the y_coor here.
+	y_coor = ADC;
+	
+
+}
 
 int main(void)
 {
@@ -37,7 +91,12 @@ int main(void)
 	_delay_ms(1000);
 	clear_buffer(buff);
 	
-	//while (1)
+	uart_init();
+	
+	setupADC();
+	adcStartConversion();
+	
+	while (1)
 	{
 // 		drawchar(buff,0,0,displayChar);
 // 		write_buffer(buff);
@@ -59,9 +118,14 @@ int main(void)
 // 		drawstring(buff, 0, 2, word);
 		
 //		drawrect(buff, 0,0, 80, 60, BLACK);
-		fillrect(buff, 0,0, 80, 60, BLACK);
+//		fillrect(buff, 0,0, 80, 60, BLACK);
 
-		write_buffer(buff);
+		//drawcircle(buff, 15, 15, 8, BLACK);
+
+		//write_buffer(buff);
+		getADCval();
+		
+		printf("x: %u, y: %u \n", x_coor, y_coor);
 	}
 	
 	
