@@ -602,95 +602,71 @@ void drawrect(uint8_t *buff,uint8_t x, uint8_t y, uint8_t w, uint8_t h,uint8_t c
 
 
 // function to draw a circle
-// algo taken from https://www.geeksforgeeks.org/mid-point-circle-drawing-algorithm/
+// algo taken from wikipedia
 void drawcircle(uint8_t *buff,uint8_t x0, uint8_t y0, uint8_t r,uint8_t color) {
 	
-	uint8_t x = r, y = 0;
-	
-	// print the initial point
-	setpixel(buff, x + x0, y + y0, color);
-	
-	// When radius is zero only a single
-    // point will be printed
-	if(r >= 0)
-	{
-		setpixel(buff, x + x0, (-1)*y + y0, color);
-		setpixel(buff, y + x0, x + y0, color);
-		setpixel(buff, (-1)*y + x0, x + y0, color);
-	}
-	
-	uint8_t P = 1 - r;
-	
-	while (x > y)
-	{
-		y++;
-		
-		if(P <= 0)
-			P = P +2*y + 1;
-		
-		else
-		{
-			x--;
-			P = P + 2*y - 2*x + 1;
-		}
-		
-		if(x < y)
-			break;
-		
-		setpixel(buff, x + x0, y + y0, color);
-		setpixel(buff, (-1)*x + x0, y + y0, color);
-		setpixel(buff, x + x0, y + (-1)*y0, color);
-		setpixel(buff, (-1)*x + x0, (-1)*y + y0, color);
-		
-		if( x != y)
-		{
-			setpixel(buff, y + x0, x + y0, color);
-			setpixel(buff, (-1)*y + x0, x + y0, color);
-			setpixel(buff, y + x0, (-1)*x + y0, color);
-			setpixel(buff, (-1)*y + x0, (-1)*x + y0, color);
-		}
-		
-	}
+	int x = r-1;
+    int y = 0;
+    int dx = 1;
+    int dy = 1;
+    int err = dx - (r << 1);
+
+    while (x >= y)
+    {
+        setpixel(buff,x0 + x, y0 + y,color);
+        setpixel(buff,x0 + y, y0 + x,color);
+        setpixel(buff,x0 - y, y0 + x,color);
+        setpixel(buff,x0 - x, y0 + y,color);
+        setpixel(buff,x0 - x, y0 - y,color);
+        setpixel(buff,x0 - y, y0 - x,color);
+        setpixel(buff,x0 + y, y0 - x,color);
+        setpixel(buff,x0 + x, y0 - y,color);
+
+        if (err <= 0)
+        {
+            y++;
+            err += dy;
+            dy += 2;
+        }
+        
+        if (err > 0)
+        {
+            x--;
+            dx += 2;
+            err += dx - (r << 1);
+        }
+    }
 	
 }
 
 
 // function to draw a filled circle
 void fillcircle(uint8_t *buff,uint8_t x0, uint8_t y0, uint8_t r,uint8_t color) {
-uint8_t x = r, y = 0;
-	
-	// print the initial point
-	setpixel(buff, x + x0, y + y0, color);
-	
-	// When radius is zero only a single
-    // point will be printed
-	if(r >= 0)
-	{
-		setpixel(buff, x + x0, (-1)*y + y0, color);
-		setpixel(buff, y + x0, x + y0, color);
-		setpixel(buff, (-1)*y + x0, x + y0, color);
-	}
-	
-	uint8_t P = 1 - r;
-	
-	while (x > y)
-	{
-		y++;
-		
-		if(P <= 0)
-			P = P +2*y + 1;
-		
-		else
-		{
-			x--;
-			P = P + 2*y - 2*x + 1;
-		}
-		
-		if(x < y)
-			break;
+	int x = r-1;
+    int y = 0;
+    int dx = 1;
+    int dy = 1;
+    int err = dx - (r << 1);
 
-		drawline(buff,x + x0, y + y0,(-1)*x + x0, y + y0,color);
-		drawline(buff,x + x0, (-1)*y + y0,(-1)*x + x0,  (-1)*y + y0,color);
-	}
+    while (x >= y)
+    {
+		drawline(buff,x0 - x, y0 + y,x0 - x, y0 - y,color);
+        drawline(buff,x0 + x, y0 + y,x0 + x, y0 - y,color);
+        drawline(buff,x0 - y, y0 + x,x0 - y, y0 - x,color );
+        drawline(buff,x0 + y, y0 - x,x0 + y, y0 + x,color );
+	if (err <= 0)
+        {
+            y++;
+            err += dy;
+            dy += 2;
+        }
+        
+        if (err > 0)
+        {
+            x--;
+            dx += 2;
+            err += dx - (r << 1);
+        }
+    }	
 }
 
