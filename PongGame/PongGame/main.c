@@ -27,9 +27,10 @@ void setupADC(void){
 	ADMUX |= (1 << REFS0); 	// Setting ADC to use VCC as reference voltage
 	//  Use A0 pin to read input
 
-	ADCSRA |= (1 << ADATE) | (1 << ADEN) | (1<< ADPS1) ; // Turn ADC on,
+	ADCSRA |= (1 << ADATE) | (1 << ADEN) | (1<< ADPS1) | (1 << ADPS2) | (1 << ADPS0); // Turn ADC on,
 														 //  Use pre-scaler as 4
 														 //  Set auto-trigger.
+	DIDR0 |= 1 << ADC0D;
 }
 
 void adcStartConversion(void){
@@ -39,23 +40,20 @@ void adcStartConversion(void){
 void getADCval() {
 
 	// Disable the ADC mode
-	ADMUX &= ~(1 << MUX3);
+	//ADMUX &= ~(1 << MUX3);
 	
+	// Set Y- Y+ to ADC input.
+	//ADMUX |= 0xf0;
 	// Set X- , X+ to digital pins.
 	DDRC  = (1 << PORTC1) | (1 << PORTC3);
 	// Set X- high and X+ low.
 	PORTC |= (1 << PORTC3);
 	PORTC &= ~(1 << PORTC1);
 	
-	// Set Y- Y+ to ADC input.
-	ADMUX |= (0 << MUX0);
-	
 	// Read the x_coor here.
 	x_coor = ADC;
 	
 	// Now set configuration for the y_coor.
-	// Disable the ADC mode.
-	ADMUX &= ~(1 << MUX0);
 	
 	// Set Y-, Y+ to digital pins.
 	DDRC = (1 << PORTC0) | (1 << PORTC2);
@@ -64,12 +62,13 @@ void getADCval() {
 	PORTC &= ~(1 << PORTC2);
 	
 	// Set X- X+ to ADC input.
-	ADMUX |= (1 << MUX3);
+	ADMUX |= (1 << MUX0) | (1 << MUX1);
 	
 	// Read the y_coor here.
 	y_coor = ADC;
+	//PORTC &= ~(1<<PORTC0);
 	
-
+	
 }
 
 int main(void)
@@ -120,11 +119,12 @@ int main(void)
 //		drawrect(buff, 0,0, 80, 60, BLACK);
 //		fillrect(buff, 0,0, 80, 60, BLACK);
 
-		//drawcircle(buff, 15, 15, 8, BLACK);
+		drawcircle(buff, 15, 15, 8, BLACK);
 
-		//write_buffer(buff);
+		write_buffer(buff);
 		getADCval();
 		
+		//uint16_t f = ADC;
 		printf("x: %u, y: %u \n", x_coor, y_coor);
 	}
 	
