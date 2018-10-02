@@ -1,3 +1,5 @@
+#ifndef LCD_H_
+#define LCD_H_
 
 #define CMD_DISPLAY_OFF   0xAE
 #define CMD_DISPLAY_ON    0xAF
@@ -78,3 +80,4 @@ void fillcircle(uint8_t *buff,
 uint8_t x0, uint8_t y0, uint8_t r,
 uint8_t color);
 
+#endif

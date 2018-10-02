@@ -34,9 +34,6 @@
 
 uint8_t is_reversed = 0;
 
-void plotLineHigh(uint8_t *buff, uint8_t x0, uint8_t y0, uint8_t x1, uint8_t y1);
-void plotLineLow(uint8_t *buff, uint8_t x0, uint8_t y0, uint8_t x1, uint8_t y1);
-
 int pagemap[] = { 3, 2, 1, 0, 7, 6, 5, 4 };
 
 // buffer input which prints initial splash
@@ -502,7 +499,10 @@ void drawchar(uint8_t *buff, uint8_t x, uint8_t line, uint8_t c) {
 
 // the most basic function, set a single pixel
 void setpixel(uint8_t *buff, uint8_t x, uint8_t y, uint8_t color) {
-	buff[x + (y/8)*128] |= (color << (7 -(y%8)));
+	if(color)
+		buff[x + (y/8)*128] |= (1 << (7 -(y%8)));
+	else
+		buff[x + (y/8)*128] &= ~(1 << (7 -(y%8)));
 }
 
 // function to clear a single pixel
@@ -513,31 +513,31 @@ void clearpixel(uint8_t *buff, uint8_t x, uint8_t y) {
 // function to write a string on the lcd
 void drawstring(uint8_t *buff, uint8_t x, uint8_t line, uint8_t *c) {
 	uint8_t i = 0;
-	while (c[i] != '\0') 
+	while (c[i] != '\0')
 	{
 		drawchar(buff, x, line, c[i]);
 		i++;
 		x += 6; // 6 pixels wide
-		if (x + 6 >= LCDWIDTH) 
+		if (x + 6 >= LCDWIDTH)
 		{
 			x = 0;    // ran out of this line
 			line++;
 		}
 		if (line >= (LCDHEIGHT/8))
-			return;        
-}
+		return;
+	}
 
 }
 
 // use bresenham's algorithm to write this function to draw a line
 void drawline(uint8_t *buff,uint8_t x0, uint8_t y0, uint8_t x1, uint8_t y1,uint8_t color) {
 	uint8_t steep = abs(y1 - y0) > abs(x1 - x0);
-	if (steep) 
+	if (steep)
 	{
 		swap(x0, y0);
 		swap(x1, y1);
 	}
-	if (x0 > x1) 
+	if (x0 > x1)
 	{
 		swap(x0, x1);
 		swap(y0, y1);
@@ -550,34 +550,33 @@ void drawline(uint8_t *buff,uint8_t x0, uint8_t y0, uint8_t x1, uint8_t y1,uint8
 	int8_t err = dx / 2;
 	int8_t ystep;
 
-	if (y0 < y1) 
+	if (y0 < y1)
 	{
 		ystep = 1;
-	} 
-	else 
+	}
+	else
 	{
 		ystep = -1;
 	}
 
-	for (; x0<=x1; x0++) 
+	for (; x0<=x1; x0++)
 	{
-		if (steep) 
+		if (steep)
 		{
 			setpixel(buff, y0, x0, color);
-		} 
-		else 
+		}
+		else
 		{
 			setpixel(buff, x0, y0, color);
 		}
 		err -= dy;
-		if (err < 0) 
+		if (err < 0)
 		{
 			y0 += ystep;
 			err += dx;
 		}
 	}
 }
-
 
 // function to draw a filled rectangle
 void fillrect(uint8_t *buff,uint8_t x, uint8_t y, uint8_t w, uint8_t h,uint8_t color) {
@@ -588,7 +587,6 @@ void fillrect(uint8_t *buff,uint8_t x, uint8_t y, uint8_t w, uint8_t h,uint8_t c
 	}
 	
 }
-
 
 // function to draw a rectangle
 void drawrect(uint8_t *buff,uint8_t x, uint8_t y, uint8_t w, uint8_t h,uint8_t color) {
@@ -602,71 +600,71 @@ void drawrect(uint8_t *buff,uint8_t x, uint8_t y, uint8_t w, uint8_t h,uint8_t c
 
 
 // function to draw a circle
-// algo taken from wikipedia
+// algo taken from https://www.geeksforgeeks.org/mid-point-circle-drawing-algorithm/
 void drawcircle(uint8_t *buff,uint8_t x0, uint8_t y0, uint8_t r,uint8_t color) {
 	
 	int x = r-1;
-    int y = 0;
-    int dx = 1;
-    int dy = 1;
-    int err = dx - (r << 1);
+	int y = 0;
+	int dx = 1;
+	int dy = 1;
+	int err = dx - (r << 1);
 
-    while (x >= y)
-    {
-        setpixel(buff,x0 + x, y0 + y,color);
-        setpixel(buff,x0 + y, y0 + x,color);
-        setpixel(buff,x0 - y, y0 + x,color);
-        setpixel(buff,x0 - x, y0 + y,color);
-        setpixel(buff,x0 - x, y0 - y,color);
-        setpixel(buff,x0 - y, y0 - x,color);
-        setpixel(buff,x0 + y, y0 - x,color);
-        setpixel(buff,x0 + x, y0 - y,color);
+	while (x >= y)
+	{
+		setpixel(buff,x0 + x, y0 + y,color);
+		setpixel(buff,x0 + y, y0 + x,color);
+		setpixel(buff,x0 - y, y0 + x,color);
+		setpixel(buff,x0 - x, y0 + y,color);
+		setpixel(buff,x0 - x, y0 - y,color);
+		setpixel(buff,x0 - y, y0 - x,color);
+		setpixel(buff,x0 + y, y0 - x,color);
+		setpixel(buff,x0 + x, y0 - y,color);
 
-        if (err <= 0)
-        {
-            y++;
-            err += dy;
-            dy += 2;
-        }
-        
-        if (err > 0)
-        {
-            x--;
-            dx += 2;
-            err += dx - (r << 1);
-        }
-    }
+		if (err <= 0)
+		{
+			y++;
+			err += dy;
+			dy += 2;
+		}
+		
+		if (err > 0)
+		{
+			x--;
+			dx += 2;
+			err += dx - (r << 1);
+		}
+	}
 	
 }
-
 
 // function to draw a filled circle
 void fillcircle(uint8_t *buff,uint8_t x0, uint8_t y0, uint8_t r,uint8_t color) {
 	int x = r-1;
-    int y = 0;
-    int dx = 1;
-    int dy = 1;
-    int err = dx - (r << 1);
+	int y = 0;
+	int dx = 1;
+	int dy = 1;
+	int err = dx - (r << 1);
 
-    while (x >= y)
-    {
+	while (x >= y)
+	{
 		drawline(buff,x0 - x, y0 + y,x0 - x, y0 - y,color);
-        drawline(buff,x0 + x, y0 + y,x0 + x, y0 - y,color);
-        drawline(buff,x0 - y, y0 + x,x0 - y, y0 - x,color );
-        drawline(buff,x0 + y, y0 - x,x0 + y, y0 + x,color );
-	if (err <= 0)
-        {
-            y++;
-            err += dy;
-            dy += 2;
-        }
-        
-        if (err > 0)
-        {
-            x--;
-            dx += 2;
-            err += dx - (r << 1);
-        }
-    }	
+		drawline(buff,x0 + x, y0 + y,x0 + x, y0 - y,color);
+		drawline(buff,x0 - y, y0 + x,x0 - y, y0 - x,color );
+		drawline(buff,x0 + y, y0 - x,x0 + y, y0 + x,color );
+		
+		if (err <= 0)
+		{
+			y++;
+			err += dy;
+			dy += 2;
+		}
+		
+		if (err > 0)
+		{
+			x--;
+			dx += 2;
+			err += dx - (r << 1);
+		}
+	}
 }
 
