@@ -28,7 +28,7 @@ const float F = 101.9308;
 
 char displayChar = '0';
 
-// To check if two ADC values are same, ony then plot the value!!
+// To check if two ADC values are same, only then plot the value!!
 uint8_t touchTwoTimes = 1;
 uint16_t x_old;
 uint16_t y_old;
@@ -41,23 +41,138 @@ uint16_t y_coor;
 int8_t dx;
 int8_t dy;
 
+// initial position of the ball
 uint8_t ballx = 63;
 uint8_t bally = 28;
 
+// For calculating actual pixel based on touch screen values.
+uint8_t calc_x_pixel;
+uint8_t calc_y_pixel;
+
+// Properties of two paddles
+struct Paddle pL;
+struct Paddle pR;
+
+// Score keeping.
+uint8_t leftScore = 0;
+uint8_t rightScore = 0;
+
+uint8_t botMode = 0;
+
+void generateGrid(){
+
+    drawrect(buff, 0, 0, 127, 63, BLACK);
+    for (int i= 0; i< 63 ; i+=8){
+        drawline(buff, 63 , i, 63,i+4, BLACK);
+    }
+    write_buffer(buff);
+}
+
+void scoreBoard(int left, int right){
+    
+    drawchar(buff, 57,0, displayChar+left);
+    drawchar(buff, 65,0, displayChar+right);
+    write_buffer(buff);
+
+}
+
+void refreshScreen()
+{
+    generateGrid();
+    generatePadLeft(pL);
+    generatePadRight(pR);
+    scoreBoard(leftScore,rightScore);
+
+}
+
+void resetScreen()
+{
+    clear_buffer(buff);
+    
+    pL.posx = 2;
+    pL.posy = 28;
+    
+    pR.posx = 2;
+    pR.posy = 28;
+
+    ballx = 63;
+    bally = 28;
+    
+    int direction = rand()%5;
+
+    dx = rand()%4+1;
+    dy = rand()%4+1;
+    
+    if(direction < 2)
+    {
+        dx = -dx;
+        dy = -dy;
+    }
+
+    generateGrid();
+    generatePadLeft(pL);
+    generatePadRight(pR);
+    //drawcircle(buff, ballx, bally, 3, BLACK);
+    scoreBoard(leftScore,rightScore);
+}
 
 void updateBall()
 {
 	fillcircle(buff, ballx, bally, 3, 0);
-	if( ballx+dx+2 >= 126 || ballx+dx-2 <= 0)
-	{
-		dx = (-1)*dx;
-	}
+
 	if(bally+dy+2 >= 63 || bally+dy-2 <= 0)
 	{
 		dy = (-1)*dy;
 	}
-	ballx += dx;
-	bally += dy;
+    if(botMode){
+        if(ballx+dx+2 >= 124)
+        {
+            pR.posy = bally+dy+2;
+            generatePadRight(pR);
+            dx = (-1)*dx;    
+        }
+        else if(ballx+dx-2 <= 3 && (bally+dy+2 > pL.posy+4 || bally+dy+2 < pL.posy-4))
+        {
+            rightScore++;
+            resetScreen();
+        }
+        else if(ballx+dx-2 <= 3 && (bally+dy+2 <= pL.posy+4 && bally+dy+2 >= pL.posy-4))
+        {
+            dx = (-1)*dx;
+        }
+        else
+        {
+           // Do nothing.
+        }
+    }
+    else
+    {
+        if(ballx+dx+2 >= 124 && (bally+dy+2 > pR.posy+4 || bally+dy+2 < pR.posy-4))
+        {
+            leftScore++;
+            resetScreen();
+        }
+        else if(ballx+dx-2 <= 3 && (bally+dy+2 > pL.posy+4 || bally+dy+2 < pL.posy-4))
+        {
+            rightScore++;
+            resetScreen();
+        }
+        else if(ballx+dx+2 >= 124 && (bally+dy+2 <= pR.posy+4 && bally+dy+2 >= pR.posy-4))
+        {
+            dx = (-1)*dx;
+        }
+        else if(ballx+dx-2 <= 3 && (bally+dy+2 <= pL.posy+4 && bally+dy+2 >= pL.posy-4))
+        {
+            dx = (-1)*dx;
+        }
+        else
+        {
+            //nothing
+        }
+    }
+
+    ballx += dx;
+    bally += dy;
 	fillcircle(buff, ballx, bally, 3, BLACK);
 	write_buffer(buff);
 }
@@ -69,7 +184,6 @@ void setupADC(void){
 
 	ADCSRA |=  (1 << ADEN) | (1<< ADPS1) | (1 << ADPS2) | (1 << ADPS0); // Turn ADC on,
 	//  Use pre-scaler as 4
-	//  Set auto-trigger.
 	DIDR0 |= 1 << ADC0D;
 }
 
@@ -104,15 +218,15 @@ void getXval(){
 
 	// Read the x_coor here.
 	x_coor = ADC;
-	//TouchStandby();
+	
 	PORTC &= ~(1 << PORTC3);
 }
 
 void getYval(){
 
-	// Now set configuration for the y_coor.
+    // Now set configuration for the y_coor.
 	
-	// Set Y-, Y+ to digital pins.
+    // Set Y-, Y+ to digital pins.
 	DDRC = (1 << PORTC0) | (1 << PORTC2) ;
 	// Set Y- high, Y+ low.
 	PORTC |= (1 << PORTC0);
@@ -126,7 +240,7 @@ void getYval(){
 	ADCSRA|=(1<<ADIF);
 	// Read the y_coor here.
 	y_coor = ADC;
-	//TouchStandby();
+	
 	PORTC &= ~(1 << PORTC0);
 }
 
@@ -134,24 +248,6 @@ void getADCval() {
 
 	getXval();
 	getYval();
-}
-
-
-void generateGrid(){
-
-	drawrect(buff, 0, 0, 127, 63, BLACK);
-	for (int i= 0; i< 63 ; i+=8){
-		drawline(buff, 63 , i, 63,i+4, BLACK);
-	}
-	write_buffer(buff);
-}
-
-void scoreBoard(int left, int right){
-	
-	drawchar(buff, 57,0, displayChar);
-	drawchar(buff, 65,0, displayChar);
-	write_buffer(buff);
-
 }
 
 int main(void)
@@ -176,75 +272,55 @@ int main(void)
 	uart_init();
 	
 	setupADC();
+
+	resetScreen();
 	
-	//For Calibration
-// 	setpixel(buff,12,6, BLACK);
-// 	setpixel(buff,114,31, BLACK);
-// 	setpixel(buff,63,57, BLACK);
-// 	write_buffer(buff);
-
-
-	generateGrid();
-	generatePadLeft(28);
-	generatePadRight(28);
-	drawcircle(buff, 63, 28, 3, BLACK);
 	
-	scoreBoard(0,0);
+    while(1)
+    {
+	    while (!(rightScore >= 7 || leftScore>=7))
+	    {
 
-	uint8_t calc_x_pixel;
-	uint8_t calc_y_pixel;
-	
-	int direction = rand()%5;
-
-	dx = rand()%2+1;
-	dy = rand()%2+1;
-	
-	if(direction < 2)
-		dy = -dy;
-	
-
-	while (1)
-	{
-		//Blinking circle
-// 		 fillcircle(buff,12,12,2,BLACK);
-// 		 _delay_ms(100);
-// 		 fillcircle(buff,12,12,2,0);
-// 		 _delay_ms(100);
-
-		updateBall();
-		_delay_ms(10);
-		getADCval();
+		    updateBall();
 		
-		touchTwoTimes++;
-		if(touchTwoTimes%2 == 0)
-		{
+		    getADCval();
+		
+		    touchTwoTimes++;
+		    if(touchTwoTimes%2 == 0)
+		    {
 			
-			touchTwoTimes = 0;
-			//printf("x: %u y: %u\n", x_old, y_old );
-			if( (x_old == x_coor) && (y_old == y_coor) )
-			{
-				calc_x_pixel = A*x_coor + B*y_coor + C;
-				calc_y_pixel = D*x_coor + E*y_coor + F;
+			    touchTwoTimes = 0;
+
+			    if( (x_old == x_coor) || (y_old == y_coor) )
+			    {
+				    calc_x_pixel = A*x_coor + B*y_coor + C;
+				    calc_y_pixel = D*x_coor + E*y_coor + F;
 				
-				//printf("x_calc: %u y_calc: %u\n", calc_x_pixel, calc_y_pixel);
+				    if(calc_y_pixel <= 0)
+					    calc_y_pixel = 4;
 				
-				//setpixel(buff, calc_x_pixel, calc_y_pixel, BLACK);
-				//write_buffer(buff);
-				if(calc_x_pixel < 63)
-					generatePadLeft(calc_y_pixel);
-				else
-					generatePadRight(calc_y_pixel);
-			}
-		}
-		else
-		{
-			x_old = x_coor;
-			y_old = y_coor;
-		}
-		//_delay_ms(10);
-	}
-	
-	
+				    if(calc_x_pixel < 63)
+				    {
+					    pL.posy = calc_y_pixel;
+					    generatePadLeft(pL);
+				    }
+				    if(!botMode && calc_x_pixel > 63 && calc_x_pixel < 127)
+				    {
+					    pR.posy = calc_y_pixel;
+					    generatePadRight(pR);
+				    }
+			    }
+		    }
+		    else
+		    {
+			    x_old = x_coor;
+			    y_old = y_coor;
+		    }
+            _delay_ms(90);
+            refreshScreen();
+	    }
+        leftScore = 0;
+        rightScore = 0;
+        resetScreen();
+    }
 }
-
-

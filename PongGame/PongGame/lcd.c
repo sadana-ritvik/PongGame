@@ -639,7 +639,7 @@ void drawcircle(uint8_t *buff,uint8_t x0, uint8_t y0, uint8_t r,uint8_t color) {
 
 // function to draw a filled circle
 void fillcircle(uint8_t *buff,uint8_t x0, uint8_t y0, uint8_t r,uint8_t color) {
-	int x = r-1;
+	int x = r;
 	int y = 0;
 	int dx = 1;
 	int dy = 1;

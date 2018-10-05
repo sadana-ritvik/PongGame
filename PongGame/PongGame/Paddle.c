@@ -9,35 +9,49 @@
 #include "Paddle.h"
 
 
-uint8_t prevL = 1;
-uint8_t prevR = 126;
+uint8_t prevL = 4;
+uint8_t prevR = 4;
 
-void generatePadLeft(uint8_t y)
+void generatePadLeft(struct Paddle p)
 {
-	drawline(buff,1,prevL,1,(prevL+8), 0);
-	drawline(buff,2,prevL,2,(prevL+8), 0);
-	
+	// Clear the paddle from last position.
+	drawline(buff, 2, prevL-4, 2, (prevL+4), 0);
+	drawline(buff, 3, prevL-4, 3, (prevL+4), 0);
 	write_buffer(buff);
-	if (y+8 > 63){
-		y -=(64-y+8);
+	
+	// Limit the paddle boundary.
+	if (p.posy+4 > 63){
+		p.posy = 63;
 	}
-	prevL=y;
-	drawline(buff, 1, y, 1, (y+8), 1);
-	drawline(buff, 2, y, 2, (y+8), 1);
+	if(p.posy-4 < 0){
+		p.posy = 4;
+	}
+	prevL=p.posy;
+	
+	// Draw the new paddle.
+	drawline(buff, 2, p.posy-4, 2, (p.posy+4), 1);
+	drawline(buff, 3, p.posy-4, 3, (p.posy+4), 1);
 	write_buffer(buff);
 }
 
-void generatePadRight(uint8_t y){
+void generatePadRight(struct Paddle p){
 
-	drawline(buff,126,prevR,126,(prevR+8), 0);
-	drawline(buff,125,prevR,125,(prevR+8), 0);
+	// Clear the paddle from last position.
+	drawline(buff, 125, prevR-4, 125, (prevR+4), 0);
+	drawline(buff, 124, prevR-4, 124, (prevR+4), 0);
 	write_buffer(buff);
-	if (y+8 > 63){
-		y -=(64-y+8);
-		
+	
+	// Limit the paddle boundary.
+	if (p.posy+4 > 63){
+		p.posy = 63;
 	}
-	prevR=y;
-	drawline(buff, 126, y, 126, (y+8), 1);
-	drawline(buff, 125, y, 125, (y+8), 1);
+	if(p.posy-4 <= 0){
+		p.posy = 4;
+	}
+	prevR=p.posy;
+	
+	// Draw the new paddle.
+	drawline(buff, 125, p.posy-4, 125, (p.posy+4), 1);
+	drawline(buff, 124, p.posy-4, 124, (p.posy+4), 1);
 	write_buffer(buff);
 }

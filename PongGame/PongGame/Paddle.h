@@ -15,8 +15,8 @@ struct Paddle{
 	uint8_t posy;
 };
 
-void generatePadLeft(uint8_t y);
-void generatePadRight(uint8_t y);
+void generatePadLeft(struct Paddle p);
+void generatePadRight(struct Paddle p);
 
 
 
