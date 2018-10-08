@@ -57,7 +57,10 @@ struct Paddle pR;
 uint8_t leftScore = 0;
 uint8_t rightScore = 0;
 
+// Variables to decide game modes.
 uint8_t botMode = 0;
+uint8_t acclMode = 0;
+uint8_t gameModeSelected = 0;
 
 void generateGrid(){
 
@@ -115,6 +118,12 @@ void resetScreen()
     //drawcircle(buff, ballx, bally, 3, BLACK);
     scoreBoard(leftScore,rightScore);
 }
+static inline void changeLCDtoRed()
+{
+    PORTB |= 0x05;
+    _delay_ms(1000);
+    PORTB &= ~0x05;
+}
 
 void updateBall()
 {
@@ -134,6 +143,7 @@ void updateBall()
         else if(ballx+dx-2 <= 3 && (bally+dy+2 > pL.posy+4 || bally+dy+2 < pL.posy-4))
         {
             rightScore++;
+            changeLCDtoRed();
             resetScreen();
         }
         else if(ballx+dx-2 <= 3 && (bally+dy+2 <= pL.posy+4 && bally+dy+2 >= pL.posy-4))
@@ -150,11 +160,13 @@ void updateBall()
         if(ballx+dx+2 >= 124 && (bally+dy+2 > pR.posy+4 || bally+dy+2 < pR.posy-4))
         {
             leftScore++;
+            changeLCDtoRed();
             resetScreen();
         }
         else if(ballx+dx-2 <= 3 && (bally+dy+2 > pL.posy+4 || bally+dy+2 < pL.posy-4))
         {
             rightScore++;
+            changeLCDtoRed();
             resetScreen();
         }
         else if(ballx+dx+2 >= 124 && (bally+dy+2 <= pR.posy+4 && bally+dy+2 >= pR.posy-4))
@@ -250,6 +262,29 @@ void getADCval() {
 	getYval();
 }
 
+void displayGameOver()
+{
+    clear_buffer(buff);
+    unsigned char word[] ="GAME OVER!!!";
+    drawstring(buff, 35, 4,word);
+    write_buffer(buff);
+
+}
+
+void displayGameMenu()
+{
+    clear_buffer(buff);
+    unsigned char welcome[] = " WELCOME TO PONG ";
+    unsigned char word1[] = "1.Player Vs Player";
+    unsigned char word2[] = "2.Player Vs Computer";
+    unsigned char word3[] = "3.Acclmtr Vs Computer";
+    drawstring(buff, 4 , 0, welcome);
+    drawstring(buff, 0, 2, word1);
+    drawstring(buff, 0, 4, word2);
+    drawstring(buff, 0, 6, word3);
+    write_buffer(buff);
+}
+
 int main(void)
 {
 	//setting up the gpio for backlight
@@ -272,13 +307,47 @@ int main(void)
 	uart_init();
 	
 	setupADC();
-
-	resetScreen();
-	
-	
     while(1)
     {
-	    while (!(rightScore >= 7 || leftScore>=7))
+        displayGameMenu();
+        while(!gameModeSelected)
+        {
+            getADCval();
+            touchTwoTimes++;
+            if(touchTwoTimes%2 == 0)
+            {
+                touchTwoTimes = 0;
+                if( (x_old == x_coor) && (y_old == y_coor) )
+                {
+                    calc_x_pixel = A*x_coor + B*y_coor + C;
+                    calc_y_pixel = D*x_coor + E*y_coor + F;
+
+                    if(calc_y_pixel >= 16 && calc_y_pixel <= 23)
+                    {
+                        botMode = 0;
+                        gameModeSelected = 1;
+                    }
+                    else if (calc_y_pixel >= 32 && calc_y_pixel <=39)
+                    {
+                        botMode = 1;
+                        gameModeSelected = 1;
+                    }
+                    else
+                    { 
+                        // do nothing 
+                    }
+                }
+            }
+            else
+            {
+                x_old = x_coor;
+                y_old = y_coor;
+            }
+        }
+
+    	resetScreen();
+
+	    while (!(rightScore >= 3 || leftScore>=3))
 	    {
 
 		    updateBall();
@@ -316,11 +385,18 @@ int main(void)
 			    x_old = x_coor;
 			    y_old = y_coor;
 		    }
-            _delay_ms(90);
+            _delay_ms(100);
             refreshScreen();
 	    }
         leftScore = 0;
         rightScore = 0;
+        gameModeSelected = 0;
+
+        displayGameOver();
+        PORTB |= 0x01;
+        _delay_ms(4000);
+        PORTB &= ~0x01;
+
         resetScreen();
     }
 }
