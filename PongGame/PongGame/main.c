@@ -60,7 +60,16 @@ uint8_t rightScore = 0;
 // Variables to decide game modes.
 uint8_t botMode = 0;
 uint8_t acclMode = 0;
+uint8_t touchMode = 0;
 uint8_t gameModeSelected = 0;
+
+// Variables for Accelerometer
+uint16_t accReading =0;
+const uint8_t size = 10;
+uint16_t movingarray[10];
+uint8_t pos =0;
+uint16_t sum=0;
+uint16_t movingAvr = 0;
 
 void generateGrid(){
 
@@ -262,6 +271,36 @@ void getADCval() {
 	getYval();
 }
 
+//Accelerometer Code
+uint16_t movingAverage(uint16_t *ptrtoNums, uint16_t *ptrSum, uint16_t pos, uint16_t len, uint16_t NextNum){
+
+    *ptrSum = *ptrSum - ptrtoNums[pos] + NextNum;
+
+    ptrtoNums[pos] = NextNum;
+
+    return (*ptrSum) / len;
+}
+
+uint16_t accelerometerReading()
+{
+    ADMUX &= 0xF0;
+    ADMUX |= (1 << MUX2);
+    _delay_ms(10);
+
+    ADCSRA |= (1 << ADSC);
+    while(!(ADCSRA & (1<<ADIF)));
+    ADCSRA|=(1<<ADIF);
+
+    movingAvr = movingAverage(movingarray, &sum, pos, size, ADC);
+    pos++;
+    if(pos >= size){
+        pos = 0;
+    }
+
+    return movingAvr;
+}
+
+
 void displayGameOver()
 {
     clear_buffer(buff);
@@ -295,7 +334,7 @@ int main(void)
 	DDRB |= 0x05;
 	PORTB &= ~0x05;
 	PORTB |= 0x00;
-	
+
 	//lcd initialisation
 	lcd_init();
 	lcd_command(CMD_DISPLAY_ON);
@@ -325,11 +364,22 @@ int main(void)
                     if(calc_y_pixel >= 16 && calc_y_pixel <= 23)
                     {
                         botMode = 0;
+                        touchMode = 1;
+                        acclMode = 0;
                         gameModeSelected = 1;
                     }
                     else if (calc_y_pixel >= 32 && calc_y_pixel <=39)
                     {
                         botMode = 1;
+                        touchMode = 1;
+                        acclMode = 0;
+                        gameModeSelected = 1;
+                    }
+                    else if (calc_y_pixel >= 48 && calc_y_pixel <=57)
+                    {
+                        botMode = 1;
+                        touchMode = 0;
+                        acclMode = 1;
                         gameModeSelected = 1;
                     }
                     else
@@ -351,43 +401,66 @@ int main(void)
 	    {
 
 		    updateBall();
-		
-		    getADCval();
-		
-		    touchTwoTimes++;
-		    if(touchTwoTimes%2 == 0)
+		    if(touchMode)
 		    {
+                getADCval();
+		
+		        touchTwoTimes++;
+		        if(touchTwoTimes%2 == 0)
+		        {
 			
-			    touchTwoTimes = 0;
+			        touchTwoTimes = 0;
 
-			    if( (x_old == x_coor) || (y_old == y_coor) )
-			    {
-				    calc_x_pixel = A*x_coor + B*y_coor + C;
-				    calc_y_pixel = D*x_coor + E*y_coor + F;
+			        if( (x_old == x_coor) || (y_old == y_coor) )
+			        {
+				        calc_x_pixel = A*x_coor + B*y_coor + C;
+				        calc_y_pixel = D*x_coor + E*y_coor + F;
 				
-				    if(calc_y_pixel <= 0)
-					    calc_y_pixel = 4;
+				        if(calc_y_pixel <= 0)
+					        calc_y_pixel = 4;
 				
-				    if(calc_x_pixel < 63)
-				    {
-					    pL.posy = calc_y_pixel;
-					    generatePadLeft(pL);
-				    }
-				    if(!botMode && calc_x_pixel > 63 && calc_x_pixel < 127)
-				    {
-					    pR.posy = calc_y_pixel;
-					    generatePadRight(pR);
-				    }
-			    }
-		    }
-		    else
-		    {
-			    x_old = x_coor;
-			    y_old = y_coor;
-		    }
+				        if(calc_x_pixel < 63)
+				        {
+					        pL.posy = calc_y_pixel;
+					        generatePadLeft(pL);
+				        }
+				        if(!botMode && calc_x_pixel > 63 && calc_x_pixel < 127)
+				        {
+					        pR.posy = calc_y_pixel;
+					        generatePadRight(pR);
+				        }
+			        }
+		        }
+		        else
+		        {
+			        x_old = x_coor;
+			        y_old = y_coor;
+		        }
+	        }
+            if(acclMode)
+            {
+                accReading = accelerometerReading();
+                if(accReading <= 300)
+                {
+                    accReading = 300;
+                }
+                else if(accReading >= 300 && accReading <= 330)
+                {
+                    // it's okay!!
+                }
+                else
+                {
+                    accReading = 330;
+                }
+                calc_y_pixel = ((accReading - 300)*56)/30+4;
+                pL.posy = calc_y_pixel;
+                generatePadLeft(pL);
+               // printf("acc Reading: %u\n", accReading);                
+            }
             _delay_ms(100);
             refreshScreen();
-	    }
+            
+        }
         leftScore = 0;
         rightScore = 0;
         gameModeSelected = 0;
