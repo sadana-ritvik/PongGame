@@ -71,6 +71,11 @@ uint8_t pos =0;
 uint16_t sum=0;
 uint16_t movingAvr = 0;
 
+// Timer setting for turning buzzer on/off.
+uint16_t overflow = 0;
+
+void GenerateBuzzerSound();
+
 void generateGrid(){
 
     drawrect(buff, 0, 0, 127, 63, BLACK);
@@ -90,15 +95,17 @@ void scoreBoard(int left, int right){
 
 void refreshScreen()
 {
+    cli();
     generateGrid();
     generatePadLeft(pL);
     generatePadRight(pR);
     scoreBoard(leftScore,rightScore);
-
+    sei();
 }
 
 void resetScreen()
 {
+    cli();
     clear_buffer(buff);
     
     pL.posx = 2;
@@ -110,7 +117,7 @@ void resetScreen()
     ballx = 63;
     bally = 28;
     
-    int direction = rand()%5;
+    uint8_t direction = rand()%5;
 
     dx = rand()%4+1;
     dy = rand()%4+1;
@@ -126,6 +133,7 @@ void resetScreen()
     generatePadRight(pR);
     //drawcircle(buff, ballx, bally, 3, BLACK);
     scoreBoard(leftScore,rightScore);
+    sei();
 }
 static inline void changeLCDtoRed()
 {
@@ -140,23 +148,28 @@ void updateBall()
 
 	if(bally+dy+2 >= 63 || bally+dy-2 <= 0)
 	{
+        GenerateBuzzerSound();
 		dy = (-1)*dy;
 	}
     if(botMode){
         if(ballx+dx+2 >= 124)
-        {
+        { 
+            GenerateBuzzerSound();
             pR.posy = bally+dy+2;
             generatePadRight(pR);
-            dx = (-1)*dx;    
+            dx = (-1)*dx;   
+            
         }
         else if(ballx+dx-2 <= 3 && (bally+dy+2 > pL.posy+4 || bally+dy+2 < pL.posy-4))
         {
             rightScore++;
+            GenerateBuzzerSound();
             changeLCDtoRed();
             resetScreen();
         }
         else if(ballx+dx-2 <= 3 && (bally+dy+2 <= pL.posy+4 && bally+dy+2 >= pL.posy-4))
         {
+            GenerateBuzzerSound();
             dx = (-1)*dx;
         }
         else
@@ -169,21 +182,25 @@ void updateBall()
         if(ballx+dx+2 >= 124 && (bally+dy+2 > pR.posy+4 || bally+dy+2 < pR.posy-4))
         {
             leftScore++;
+            GenerateBuzzerSound();
             changeLCDtoRed();
             resetScreen();
         }
         else if(ballx+dx-2 <= 3 && (bally+dy+2 > pL.posy+4 || bally+dy+2 < pL.posy-4))
         {
             rightScore++;
+            GenerateBuzzerSound();
             changeLCDtoRed();
             resetScreen();
         }
         else if(ballx+dx+2 >= 124 && (bally+dy+2 <= pR.posy+4 && bally+dy+2 >= pR.posy-4))
         {
+            GenerateBuzzerSound();
             dx = (-1)*dx;
         }
         else if(ballx+dx-2 <= 3 && (bally+dy+2 <= pL.posy+4 && bally+dy+2 >= pL.posy-4))
         {
+            GenerateBuzzerSound();
             dx = (-1)*dx;
         }
         else
@@ -323,6 +340,13 @@ void displayGameMenu()
     drawstring(buff, 0, 6, word3);
     write_buffer(buff);
 }
+void GenerateBuzzerSound(){
+    DDRB |= (1<<PORTB1);
+    OCR1A = 10; //Frequency for 10 khz
+    TCCR1B |= (1<<CS10); //Start the buzzer
+    
+    TCCR0B |= (1 << CS02)|(1 << CS00); //Start the timer0 for getting 0.5sec buzzer.
+}
 
 int main(void)
 {
@@ -335,6 +359,14 @@ int main(void)
 	PORTB &= ~0x05;
 	PORTB |= 0x00;
 
+    TIMSK0 |= (1 << TOIE0);
+    
+    // initialize counter
+    TCNT0 = 0;
+    // Timer1 for buzzer.
+    TCCR1A |= (1<<COM1A0) | (1<<WGM12); //CTC and toggle on compare 
+    sei();
+
 	//lcd initialisation
 	lcd_init();
 	lcd_command(CMD_DISPLAY_ON);
@@ -346,6 +378,7 @@ int main(void)
 	uart_init();
 	
 	setupADC();
+  
     while(1)
     {
         displayGameMenu();
@@ -471,5 +504,17 @@ int main(void)
         PORTB &= ~0x01;
 
         resetScreen();
+    }
+}
+ISR(TIMER0_OVF_vect)
+{
+    overflow++;
+    if(overflow >= 2)
+    {
+        overflow = 0;
+        
+        TCCR0B &= ~((1 << CS02)|(1 << CS00)); //Start the timer0 for getting 0.5sec buzzer.
+        TCCR1B &= ~(1<<CS10);
+        DDRB &= ~(1 << PORTB1);
     }
 }
