@@ -33,6 +33,8 @@ uint8_t touchTwoTimes = 1;
 uint16_t x_old;
 uint16_t y_old;
 
+uint8_t screeenRefresh = 0;
+
 // Coordinates from the ADC.
 uint16_t x_coor;
 uint16_t y_coor;
@@ -44,6 +46,8 @@ int8_t dy;
 // initial position of the ball
 uint8_t ballx = 63;
 uint8_t bally = 28;
+uint8_t future_x;
+uint8_t future_y;
 
 // For calculating actual pixel based on touch screen values.
 uint8_t calc_x_pixel;
@@ -119,8 +123,8 @@ void resetScreen()
     
     uint8_t direction = rand()%5;
 
-    dx = rand()%4+1;
-    dy = rand()%4+1;
+    dx = rand()%4+2;
+    dy = rand()%4+2;
     
     if(direction < 2)
     {
@@ -145,8 +149,15 @@ static inline void changeLCDtoRed()
 void updateBall()
 {
 	fillcircle(buff, ballx, bally, 3, 0);
-
-	if(bally+dy+2 >= 63 || bally+dy-2 <= 0)
+    if(dy < 0)
+    {
+        future_y = bally+dy+2;
+    }
+    else
+    {
+        future_y = bally+dy-2;
+    }
+	if(bally+dy+2 >= 62 || bally+dy-2 <= 0)
 	{
         GenerateBuzzerSound();
 		dy = (-1)*dy;
@@ -160,14 +171,14 @@ void updateBall()
             dx = (-1)*dx;   
             
         }
-        else if(ballx+dx-2 <= 3 && (bally+dy+2 > pL.posy+4 || bally+dy+2 < pL.posy-4))
+        else if(ballx+dx-2 <= 3 && (future_y > pL.posy+4 || future_y < pL.posy-4))
         {
             rightScore++;
             GenerateBuzzerSound();
             changeLCDtoRed();
             resetScreen();
         }
-        else if(ballx+dx-2 <= 3 && (bally+dy+2 <= pL.posy+4 && bally+dy+2 >= pL.posy-4))
+        else if(ballx+dx-2 <= 3 && (future_y <= pL.posy+4 && future_y >= pL.posy-4))
         {
             GenerateBuzzerSound();
             dx = (-1)*dx;
@@ -179,26 +190,26 @@ void updateBall()
     }
     else
     {
-        if(ballx+dx+2 >= 124 && (bally+dy+2 > pR.posy+4 || bally+dy+2 < pR.posy-4))
+        if(ballx+dx+2 >= 124 && (future_y > pR.posy+4 || future_y < pR.posy-4))
         {
             leftScore++;
             GenerateBuzzerSound();
             changeLCDtoRed();
             resetScreen();
         }
-        else if(ballx+dx-2 <= 3 && (bally+dy+2 > pL.posy+4 || bally+dy+2 < pL.posy-4))
+        else if(ballx+dx-2 <= 3 && (future_y > pL.posy+4 || future_y < pL.posy-4))
         {
             rightScore++;
             GenerateBuzzerSound();
             changeLCDtoRed();
             resetScreen();
         }
-        else if(ballx+dx+2 >= 124 && (bally+dy+2 <= pR.posy+4 && bally+dy+2 >= pR.posy-4))
+        else if(ballx+dx+2 >= 124 && (future_y <= pR.posy+4 && future_y >= pR.posy-4))
         {
             GenerateBuzzerSound();
             dx = (-1)*dx;
         }
-        else if(ballx+dx-2 <= 3 && (bally+dy+2 <= pL.posy+4 && bally+dy+2 >= pL.posy-4))
+        else if(ballx+dx-2 <= 3 && (future_y <= pL.posy+4 && future_y >= pL.posy-4))
         {
             GenerateBuzzerSound();
             dx = (-1)*dx;
@@ -314,6 +325,7 @@ uint16_t accelerometerReading()
         pos = 0;
     }
 
+
     return movingAvr;
 }
 
@@ -340,13 +352,24 @@ void displayGameMenu()
     drawstring(buff, 0, 6, word3);
     write_buffer(buff);
 }
+
 void GenerateBuzzerSound(){
     DDRB |= (1<<PORTB1);
     OCR1A = 10; //Frequency for 10 khz
     TCCR1B |= (1<<CS10); //Start the buzzer
     
     TCCR0B |= (1 << CS02)|(1 << CS00); //Start the timer0 for getting 0.5sec buzzer.
+
+    while(overflow <3){
+        _delay_ms(0.00000001);
+    };
+    overflow = 0;
+    TCCR0B &= ~((1 << CS02)|(1 << CS00)); //Start the timer0 for getting 0.5sec buzzer.
+    TCCR1B &= ~(1<<CS10);
+    DDRB &= ~(1 << PORTB1);
+    
 }
+
 
 int main(void)
 {
@@ -473,26 +496,27 @@ int main(void)
             if(acclMode)
             {
                 accReading = accelerometerReading();
-                if(accReading <= 300)
+               // printf("%d \n", accReading);
+                if(accReading <= 303)
                 {
-                    accReading = 300;
+                    accReading = 303;
                 }
-                else if(accReading >= 300 && accReading <= 330)
+                else if(accReading >= 303 && accReading <= 330)
                 {
                     // it's okay!!
                 }
                 else
                 {
-                    accReading = 330;
+                    accReading = 336;
                 }
-                calc_y_pixel = ((accReading - 300)*56)/30+4;
+                calc_y_pixel = ((accReading - 303)*56)/33+4;
                 pL.posy = calc_y_pixel;
                 generatePadLeft(pL);
                // printf("acc Reading: %u\n", accReading);                
             }
             _delay_ms(100);
+           
             refreshScreen();
-            
         }
         leftScore = 0;
         rightScore = 0;
@@ -509,12 +533,4 @@ int main(void)
 ISR(TIMER0_OVF_vect)
 {
     overflow++;
-    if(overflow >= 2)
-    {
-        overflow = 0;
-        
-        TCCR0B &= ~((1 << CS02)|(1 << CS00)); //Start the timer0 for getting 0.5sec buzzer.
-        TCCR1B &= ~(1<<CS10);
-        DDRB &= ~(1 << PORTB1);
-    }
 }

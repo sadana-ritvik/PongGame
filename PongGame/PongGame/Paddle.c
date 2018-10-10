@@ -43,7 +43,7 @@ void generatePadRight(struct Paddle p){
 	
 	// Limit the paddle boundary.
 	if (p.posy+4 > 63){
-		p.posy = 63;
+		p.posy = 59;
 	}
 	if(p.posy-4 <= 0){
 		p.posy = 4;
