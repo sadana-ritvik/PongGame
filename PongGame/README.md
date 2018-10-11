@@ -66,5 +66,5 @@ The screen further has two elements:
  
 * Grid : The boundary walls and middle dashed lined
 * Score: Scores of two players
-
+ 
 
