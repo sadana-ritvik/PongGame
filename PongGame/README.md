@@ -79,8 +79,6 @@ while(1)
 	// Input game mode from the user using touch screen;
 	gameMode = input;
 	
-	
-	
 	while (score < 3)
 	{
 		// Update ball and process the collision conditions.
