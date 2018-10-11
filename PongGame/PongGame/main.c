@@ -56,6 +56,7 @@ uint8_t calc_y_pixel;
 // Properties of two paddles
 struct Paddle pL;
 struct Paddle pR;
+uint8_t paddleFollow = 0;
 
 // Score keeping.
 uint8_t leftScore = 0;
@@ -78,7 +79,7 @@ uint16_t movingAvr = 0;
 // Timer setting for turning buzzer on/off.
 uint16_t overflow = 0;
 
-void GenerateBuzzerSound();
+void GenerateBuzzerSound(uint16_t time);
 
 void generateGrid(){
 
@@ -89,6 +90,9 @@ void generateGrid(){
     write_buffer(buff);
 }
 
+/* 
+ * Function to update scoreboard with new score.
+ */ 
 void scoreBoard(int left, int right){
     
     drawchar(buff, 57,0, displayChar+left);
@@ -135,7 +139,6 @@ void resetScreen()
     generateGrid();
     generatePadLeft(pL);
     generatePadRight(pR);
-    //drawcircle(buff, ballx, bally, 3, BLACK);
     scoreBoard(leftScore,rightScore);
     sei();
 }
@@ -146,9 +149,40 @@ static inline void changeLCDtoRed()
     PORTB &= ~0x05;
 }
 
+/*
+ * Function to update ball position and handle collisions with different elements.
+ * There are different modes Bot vs Player, and Player Vs Player.
+ *
+ * If it hits vertical walls, the y-direction is reversed.
+ * 
+ * Bot vs Player:
+ * If it is near the bot, the bot follows the ball. Once the balls hits the paddle,
+ * it reverses its x-direction.
+ * The ball is near to the player end, it checks if it hits the paddle or not.
+ * If yes(hits paddle), then reverse x-direction. If no(hits wall), then increase score
+ * and restart the game.
+ *
+ * Player Vs Player:
+ * The ball is near to the player end, it checks if it hits the paddle or not.
+ * If yes(hits paddle), then reverse x-direction. If no(hits wall), then increase score
+ * and restart the game.
+ * 
+ */
 void updateBall()
 {
 	fillcircle(buff, ballx, bally, 3, 0);
+	
+	// Make the paddle follow ball after certain x coordinate.
+	if(botMode && ballx > 83 && dx > 0)
+    {
+        paddleFollow = 1;
+	}
+    if(paddleFollow){
+        pR.posy = bally;
+        generatePadRight(pR);
+    }
+	
+	// Calculate future coordinates of ball to detect collision.
     if(dy < 0)
     {
         future_y = bally+dy+2;
@@ -157,30 +191,35 @@ void updateBall()
     {
         future_y = bally+dy-2;
     }
+	
+	// If ball collides with the upper or lower wall, it reverses its y-direction.
 	if(bally+dy+2 >= 62 || bally+dy-2 <= 0)
 	{
-        GenerateBuzzerSound();
+        GenerateBuzzerSound(10);
 		dy = (-1)*dy;
 	}
+	
+	// Handle collisions of balls with paddles and left-right walls.
     if(botMode){
         if(ballx+dx+2 >= 124)
         { 
-            GenerateBuzzerSound();
+            GenerateBuzzerSound(10);
             pR.posy = bally+dy+2;
             generatePadRight(pR);
+            paddleFollow = 0;
             dx = (-1)*dx;   
             
         }
         else if(ballx+dx-2 <= 3 && (future_y > pL.posy+4 || future_y < pL.posy-4))
         {
             rightScore++;
-            GenerateBuzzerSound();
+            GenerateBuzzerSound(15);
             changeLCDtoRed();
             resetScreen();
         }
         else if(ballx+dx-2 <= 3 && (future_y <= pL.posy+4 && future_y >= pL.posy-4))
         {
-            GenerateBuzzerSound();
+            GenerateBuzzerSound(10);
             dx = (-1)*dx;
         }
         else
@@ -193,25 +232,25 @@ void updateBall()
         if(ballx+dx+2 >= 124 && (future_y > pR.posy+4 || future_y < pR.posy-4))
         {
             leftScore++;
-            GenerateBuzzerSound();
+            GenerateBuzzerSound(15);
             changeLCDtoRed();
             resetScreen();
         }
         else if(ballx+dx-2 <= 3 && (future_y > pL.posy+4 || future_y < pL.posy-4))
         {
             rightScore++;
-            GenerateBuzzerSound();
+            GenerateBuzzerSound(15);
             changeLCDtoRed();
             resetScreen();
         }
         else if(ballx+dx+2 >= 124 && (future_y <= pR.posy+4 && future_y >= pR.posy-4))
         {
-            GenerateBuzzerSound();
+            GenerateBuzzerSound(10);
             dx = (-1)*dx;
         }
         else if(ballx+dx-2 <= 3 && (future_y <= pL.posy+4 && future_y >= pL.posy-4))
         {
-            GenerateBuzzerSound();
+            GenerateBuzzerSound(10);
             dx = (-1)*dx;
         }
         else
@@ -226,37 +265,38 @@ void updateBall()
 	write_buffer(buff);
 }
 
+/*
+ * Set up ADC for getting touch screen and accelerometer values.
+ * -> Set Ref as voltage 5
+ * -> Enable ADC.
+ * -> Set prescaler as 128.
+ */
 void setupADC(void){
 
 	ADMUX |= (1 << REFS0); 	// Setting ADC to use VCC as reference voltage
-	//  Use A0 pin to read input
 
 	ADCSRA |=  (1 << ADEN) | (1<< ADPS1) | (1 << ADPS2) | (1 << ADPS0); // Turn ADC on,
-	//  Use pre-scaler as 4
-	DIDR0 |= 1 << ADC0D;
+																		//  Use pre-scaler as 128
+	DIDR0 |= 1 << ADC0D;	// Disable digital input buffer.
 }
 
-void adcStartConversion(void){
-	ADCSRA |= (1 << ADSC);
-}
-
-void TouchStandby(){
-	//Put To Standby
-	DDRC  = 0x02; //Setting only C1 to output
-	PORTC |= (1<<PORTC0);
-}
-
+/*
+ * Function to get x_coor from the ADC.
+ * -> Set direction of X- , X+ to input.
+ * -> Set X- to high.
+ * -> Select A0(Y-) pin of ADC.
+ * -> Start the conversion and wait for it to complete.
+ * -> Clear the ADC flag.
+ * -> Read ADC value into x_coor.
+ */
 void getXval(){
-	// Disable the ADC mode
-	//ADMUX &= ~(1 << MUX3);
 	
 	// Set Y- to ADC input.
 	// Set X- , X+ to digital pins.
-
 	DDRC  = (1 << PORTC1) | (1 << PORTC3);
+	
 	// Set X- high and X+ low.
 	PORTC |= (1 << PORTC3);
-	//PORTC &= ~(1 << PORTC1);  //0000 1101
 	ADMUX &= 0xF0;
 	_delay_ms(10);
 
@@ -271,6 +311,15 @@ void getXval(){
 	PORTC &= ~(1 << PORTC3);
 }
 
+/*
+ * Function to get y_coor from the ADC.
+ * -> Set direction of Y- , Y+ to input.
+ * -> Set Y- to high.
+ * -> Select A3(X-) pin of ADC.
+ * -> Start the conversion and wait for it to complete.
+ * -> Clear the ADC flag.
+ * -> Read ADC value into y_coor.
+ */
 void getYval(){
 
     // Now set configuration for the y_coor.
@@ -283,7 +332,9 @@ void getYval(){
 	ADMUX |= (1 << MUX0) | (1 << MUX1);
 	_delay_ms(10);
 
-	ADCSRA |= (1 << ADSC); //Start Conversion
+	//Start Conversion
+	ADCSRA |= (1 << ADSC); 
+	
 	//Wait for conversion to complete
 	while(!(ADCSRA & (1<<ADIF)));
 	ADCSRA|=(1<<ADIF);
@@ -293,13 +344,23 @@ void getYval(){
 	PORTC &= ~(1 << PORTC0);
 }
 
+/*
+ * Function to get both X and Y coordinates from touchscreen.
+ */
 void getADCval() {
 
 	getXval();
 	getYval();
 }
 
-//Accelerometer Code
+/*
+ * Function to calculate moving average for smooth movements.
+ * It keeps on adding/replacing values from the sensor to an array.
+ * ptrSum is a pointer to a location which keeps track for the Sum.
+ * returns the average of the arrray.
+ *
+ * Help from source: https://gist.github.com/bmccormack/d12f4bf0c96423d03f82
+ */
 uint16_t movingAverage(uint16_t *ptrtoNums, uint16_t *ptrSum, uint16_t pos, uint16_t len, uint16_t NextNum){
 
     *ptrSum = *ptrSum - ptrtoNums[pos] + NextNum;
@@ -309,6 +370,13 @@ uint16_t movingAverage(uint16_t *ptrtoNums, uint16_t *ptrSum, uint16_t pos, uint
     return (*ptrSum) / len;
 }
 
+
+/*
+ * Function to read accelerometer readings from ADC.
+ * -> Sets A4 pin to ADC mode.
+ * -> Starts ADC conversion and waits for it to complete.
+ * -> Gets moving average and returns it to main to set paddle position.
+ */
 uint16_t accelerometerReading()
 {
     ADMUX &= 0xF0;
@@ -324,12 +392,12 @@ uint16_t accelerometerReading()
     if(pos >= size){
         pos = 0;
     }
-
-
     return movingAvr;
 }
 
-
+/*
+ * Function to display GAME OVER!!!.
+ */
 void displayGameOver()
 {
     clear_buffer(buff);
@@ -339,6 +407,13 @@ void displayGameOver()
 
 }
 
+/*
+ * Function to display game Menu.
+ * Displays the three modes.
+ * 1. Player Vs Player.
+ * 2. Player Vs Computer.
+ * 3. Accelerometer vs Computer.
+ */
 void displayGameMenu()
 {
     clear_buffer(buff);
@@ -353,9 +428,17 @@ void displayGameMenu()
     write_buffer(buff);
 }
 
-void GenerateBuzzerSound(){
+
+/* 
+ * Function to generate buzzer sound for a short time.
+ * -> Starts Timer 0 to count the duration for which buzzer will be on.
+ * -> Starts Timer 1 in CTC mode to make buzzer work.
+ * -> Waits for Timer 0 to overflow 3 times.
+ * -> Once overflow is reached, disable the buzzer.
+ */
+void GenerateBuzzerSound(uint16_t time){
     DDRB |= (1<<PORTB1);
-    OCR1A = 10; //Frequency for 10 khz
+    OCR1A = time; //Frequency for 10 khz
     TCCR1B |= (1<<CS10); //Start the buzzer
     
     TCCR0B |= (1 << CS02)|(1 << CS00); //Start the timer0 for getting 0.5sec buzzer.
@@ -382,8 +465,11 @@ int main(void)
 	PORTB &= ~0x05;
 	PORTB |= 0x00;
 
-    TIMSK0 |= (1 << TOIE0);
-    
+	
+	/* Initialization for Timer 0 and 1 to use Buzzer */
+	
+	// Enable interrupt on timer 0.
+    TIMSK0 |= (1 << TOIE0); 
     // initialize counter
     TCNT0 = 0;
     // Timer1 for buzzer.
@@ -408,6 +494,10 @@ int main(void)
         while(!gameModeSelected)
         {
             getADCval();
+			
+			// Get touch input for selecting game mode.
+			// The touch will only work only if two consecutive values of 
+			// x and y coordinate respectively are same.
             touchTwoTimes++;
             if(touchTwoTimes%2 == 0)
             {
@@ -453,6 +543,8 @@ int main(void)
 
     	resetScreen();
 
+		// Run the game till either of the score reaches 3. 
+		// This can be set to any value.
 	    while (!(rightScore >= 3 || leftScore>=3))
 	    {
 
